@@ -22,7 +22,7 @@ lazy_static! {
 /// ```
 // TODO(tailhook) optimize Eq to compare pointers
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Symbol<V: Validator + ?Sized>(Arc<String>, PhantomData<*const V>);
+pub struct Symbol<V: Validator + ?Sized>(Arc<String>, PhantomData<V>);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct Buf(Arc<String>);

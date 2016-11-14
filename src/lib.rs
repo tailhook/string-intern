@@ -35,3 +35,30 @@ mod validator;
 
 pub use base_type::Symbol;
 pub use validator::Validator;
+
+#[cfg(test)]
+mod test {
+    use super::{Validator, Symbol};
+
+    struct AnyString;
+
+    impl Validator for AnyString {
+        // Use an error from standard library to make example shorter
+        type Err = ::std::string::ParseError;
+        fn validate_symbol(_: &str) -> Result<(), Self::Err> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_sync() {
+        fn sync<T: Sync>(_: T) { }
+        sync(Symbol::<AnyString>::from("x"))
+    }
+
+    #[test]
+    fn test_send() {
+        fn send<T: Send>(_: T) { }
+        send(Symbol::<AnyString>::from("x"))
+    }
+}
