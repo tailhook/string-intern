@@ -22,13 +22,13 @@ lazy_static! {
 /// ```
 // TODO(tailhook) optimize Eq to compare pointers
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Symbol<V: Validator>(Arc<String>, PhantomData<*const V>);
+pub struct Symbol<V: Validator + ?Sized>(Arc<String>, PhantomData<*const V>);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct Buf(Arc<String>);
 
 
-impl<V: Validator> FromStr for Symbol<V> {
+impl<V: Validator + ?Sized> FromStr for Symbol<V> {
     type Err = V::Err;
     fn from_str(s: &str) -> Result<Symbol<V>, Self::Err> {
         if let Some(a) = ATOMS.read().expect("atoms locked").get(s) {
@@ -47,13 +47,19 @@ impl<V: Validator> FromStr for Symbol<V> {
     }
 }
 
-impl<V: Validator> Borrow<str> for Symbol<V> {
+impl<V: Validator + ?Sized> AsRef<str> for Symbol<V> {
+    fn as_ref(&self) -> &str {
+        &self.0[..]
+    }
+}
+
+impl<V: Validator + ?Sized> Borrow<str> for Symbol<V> {
     fn borrow(&self) -> &str {
         &self.0[..]
     }
 }
 
-impl<V: Validator> Borrow<String> for Symbol<V> {
+impl<V: Validator + ?Sized> Borrow<String> for Symbol<V> {
     fn borrow(&self) -> &String {
         &self.0
     }
@@ -71,13 +77,13 @@ impl Borrow<String> for Buf {
     }
 }
 
-impl<V: Validator> fmt::Debug for Symbol<V> {
+impl<V: Validator + ?Sized> fmt::Debug for Symbol<V> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "s{:?}", self.0)
+        V::display(self, fmt)
     }
 }
 
-impl<V: Validator> fmt::Display for Symbol<V> {
+impl<V: Validator + ?Sized> fmt::Display for Symbol<V> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt(fmt)
     }
@@ -92,14 +98,14 @@ impl<V: Validator> Decodable for Symbol<V> {
     }
 }
 
-impl<V: Validator> Deref for Symbol<V> {
+impl<V: Validator + ?Sized> Deref for Symbol<V> {
     type Target = str;
     fn deref(&self) -> &str {
         &self.0
     }
 }
 
-impl<V: Validator> Symbol<V> {
+impl<V: Validator + ?Sized> Symbol<V> {
     /// Create a symbol from a static string
     ///
     /// # Panics
