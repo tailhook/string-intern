@@ -3,7 +3,7 @@ String Interning Library
 ========================
 
 :Status: Beta
-:Documentation: `See examples <http://github.com/tailhook/string-intern>`_
+:Documentation: http://docs.rs/string-intern/
 
 
 Another implementation of string interning for rust. Features:
