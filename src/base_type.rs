@@ -1,5 +1,6 @@
 use std::fmt;
-use std::ops::Deref;
+use std::ops::{Deref};
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use std::marker::PhantomData;
 use std::borrow::Borrow;
@@ -21,11 +22,29 @@ lazy_static! {
 /// type MySymbol = Symbol<MyValidator>;
 /// ```
 // TODO(tailhook) optimize Eq to compare pointers
-#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Symbol<V: Validator + ?Sized>(Arc<String>, PhantomData<V>);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct Buf(Arc<String>);
+
+impl<V: Validator + ?Sized> Clone for Symbol<V> {
+    fn clone(&self) -> Symbol<V> {
+        Symbol(self.0.clone(), PhantomData)
+    }
+}
+
+impl<V: Validator + ?Sized> PartialEq for Symbol<V> {
+    fn eq(&self, other: &Symbol<V>) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+impl<V: Validator + ?Sized> Eq for Symbol<V> {}
+
+impl<V: Validator + ?Sized> Hash for Symbol<V> {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.0.hash(hasher)
+    }
+}
 
 
 impl<V: Validator + ?Sized> FromStr for Symbol<V> {
@@ -117,5 +136,43 @@ impl<V: Validator + ?Sized> Symbol<V> {
     pub fn from(s: &'static str) -> Symbol<V> {
         FromStr::from_str(s)
         .expect("static strings used as atom is invalid")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use {Validator, Symbol};
+
+    #[allow(dead_code)]
+    struct AnyString;
+    type Atom = Symbol<AnyString>;
+
+    impl Validator for AnyString {
+        // Use an error from standard library to make example shorter
+        type Err = ::std::string::ParseError;
+        fn validate_symbol(_: &str) -> Result<(), Self::Err> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn eq() {
+        assert_eq!(Atom::from("x"), Atom::from("x"));
+    }
+
+    #[test]
+    fn clone() {
+        assert_eq!(Atom::from("x").clone(), Atom::from("x"));
+    }
+
+    #[test]
+    fn hash() {
+        use std::collections::HashMap;
+        let mut h = HashMap::new();
+        h.insert(Atom::from("x"), 123);
+        assert_eq!(h.get("x"), Some(&123));
+        assert_eq!(h.get(&Atom::from("x")), Some(&123));
+        assert_eq!(h.get("y"), None);
+        assert_eq!(h.get(&Atom::from("y")), None);
     }
 }
