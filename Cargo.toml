@@ -10,7 +10,7 @@ readme = "README.rst"
 keywords = ["intern", "string", "atom"]
 homepage = "http://github.com/tailhook/string-intern"
 documentation = "http://docs.rs/string-intern"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["paul@colomiets.name"]
 
 [dependencies]
