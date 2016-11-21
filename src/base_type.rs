@@ -50,10 +50,10 @@ impl<V: Validator + ?Sized> Hash for Symbol<V> {
 impl<V: Validator + ?Sized> FromStr for Symbol<V> {
     type Err = V::Err;
     fn from_str(s: &str) -> Result<Symbol<V>, Self::Err> {
+        V::validate_symbol(s)?;
         if let Some(a) = ATOMS.read().expect("atoms locked").get(s) {
             return Ok(Symbol(a.0.clone(), PhantomData));
         }
-        V::validate_symbol(s)?;
         let newsymbol = Arc::new(String::from(s));
         let mut atoms = ATOMS.write().expect("atoms locked");
         if !atoms.insert(Buf(newsymbol.clone())) {
@@ -141,23 +141,39 @@ impl<V: Validator + ?Sized> Symbol<V> {
     /// Use `FromStr::from_str(x)` or `x.parse()` to parse user input
     pub fn from(s: &'static str) -> Symbol<V> {
         FromStr::from_str(s)
-        .expect("static strings used as atom is invalid")
+        .expect("static string used as atom is invalid")
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::io;
     use rustc_serialize::json;
     use {Validator, Symbol};
 
     #[allow(dead_code)]
     struct AnyString;
+    #[allow(dead_code)]
+    struct AlphaNumString;
     type Atom = Symbol<AnyString>;
+    type AlphaNum = Symbol<AlphaNumString>;
 
     impl Validator for AnyString {
         // Use an error from standard library to make example shorter
         type Err = ::std::string::ParseError;
         fn validate_symbol(_: &str) -> Result<(), Self::Err> {
+            Ok(())
+        }
+    }
+
+    impl Validator for AlphaNumString {
+        // Use an error from standard library to make example shorter
+        type Err = io::Error;
+        fn validate_symbol(s: &str) -> Result<(), Self::Err> {
+            if s.chars().any(|c| !c.is_alphanumeric()) {
+                return Err(io::Error::new(io::ErrorKind::InvalidData,
+                    "Character is not alphanumeric"));
+            }
             Ok(())
         }
     }
@@ -192,5 +208,15 @@ mod test {
     fn decode() {
         assert_eq!(json::decode::<Atom>(r#""xyz""#).unwrap(),
                    Atom::from("xyz"));
+    }
+
+    #[test]
+    #[should_panic(message="static strings used as atom is invalid")]
+    fn distinct_validators() {
+        let _xa = Atom::from("x");
+        let _xn = AlphaNum::from("x");
+        let _ya = Atom::from("a-b");
+        // This should fail on invalid value, but didn't fail in <= v0.1.2
+        let _yn = AlphaNum::from("a-b");
     }
 }
