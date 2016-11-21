@@ -7,7 +7,7 @@ use std::borrow::Borrow;
 use std::sync::{Arc, RwLock};
 use std::collections::HashSet;
 
-use rustc_serialize::{Decoder, Decodable};
+use rustc_serialize::{Decoder, Decodable, Encoder, Encodable};
 use {Validator};
 
 lazy_static! {
@@ -117,6 +117,12 @@ impl<V: Validator> Decodable for Symbol<V> {
     }
 }
 
+impl<V: Validator> Encodable for Symbol<V> {
+    fn encode<E: Encoder>(&self, d: &mut E) -> Result<(), E::Error> {
+        d.emit_str(&self.0)
+    }
+}
+
 impl<V: Validator + ?Sized> Deref for Symbol<V> {
     type Target = str;
     fn deref(&self) -> &str {
@@ -141,6 +147,7 @@ impl<V: Validator + ?Sized> Symbol<V> {
 
 #[cfg(test)]
 mod test {
+    use rustc_serialize::json;
     use {Validator, Symbol};
 
     #[allow(dead_code)]
@@ -174,5 +181,16 @@ mod test {
         assert_eq!(h.get(&Atom::from("x")), Some(&123));
         assert_eq!(h.get("y"), None);
         assert_eq!(h.get(&Atom::from("y")), None);
+    }
+
+    #[test]
+    fn encode() {
+        assert_eq!(json::encode(&Atom::from("xyz")).unwrap(),
+                   r#""xyz""#);
+    }
+    #[test]
+    fn decode() {
+        assert_eq!(json::decode::<Atom>(r#""xyz""#).unwrap(),
+                   Atom::from("xyz"));
     }
 }
