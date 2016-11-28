@@ -1,17 +1,19 @@
 use std::fmt;
-use std::ops::{Deref};
+use std::ops::{Deref, Drop};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use std::marker::PhantomData;
 use std::borrow::Borrow;
-use std::sync::{Arc, RwLock};
-use std::collections::HashSet;
+use std::sync::{Arc, RwLock, Weak};
+use std::collections::HashMap;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 
 use rustc_serialize::{Decoder, Decodable, Encoder, Encodable};
 use {Validator};
 
 lazy_static! {
-    static ref ATOMS: RwLock<HashSet<Buf>> = RwLock::new(HashSet::new());
+    static ref ATOMS: RwLock<HashMap<Buf, Weak<Value>>> =
+        RwLock::new(HashMap::new());
 }
 
 /// Base symbol type
@@ -22,10 +24,13 @@ lazy_static! {
 /// type MySymbol = Symbol<MyValidator>;
 /// ```
 // TODO(tailhook) optimize Eq to compare pointers
-pub struct Symbol<V: Validator + ?Sized>(Arc<String>, PhantomData<V>);
+pub struct Symbol<V: Validator + ?Sized>(Arc<Value>, PhantomData<V>);
+
+#[derive(PartialEq, Eq, Hash)]
+struct Buf(Arc<String>);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct Buf(Arc<String>);
+struct Value(Arc<String>);
 
 impl<V: Validator + ?Sized> Clone for Symbol<V> {
     fn clone(&self) -> Symbol<V> {
@@ -52,35 +57,44 @@ impl<V: Validator + ?Sized> FromStr for Symbol<V> {
     fn from_str(s: &str) -> Result<Symbol<V>, Self::Err> {
         V::validate_symbol(s)?;
         if let Some(a) = ATOMS.read().expect("atoms locked").get(s) {
-            return Ok(Symbol(a.0.clone(), PhantomData));
+            return Ok(Symbol(a.upgrade().unwrap().clone(), PhantomData));
         }
-        let newsymbol = Arc::new(String::from(s));
+        let buf = Arc::new(String::from(s));
         let mut atoms = ATOMS.write().expect("atoms locked");
-        if !atoms.insert(Buf(newsymbol.clone())) {
-            // Race condition happened, but now we are still holding lock
-            // so it's safe to unwrap
-            return Ok(Symbol(atoms.get(s).unwrap().0.clone(), PhantomData));
-        } else {
-            return Ok(Symbol(newsymbol, PhantomData));
-        }
+        let val = match atoms.entry(Buf(buf.clone())) {
+            Occupied(e) => e.get().upgrade().unwrap(),
+            Vacant(e) => {
+                let result = Arc::new(Value(buf));
+                e.insert(Arc::downgrade(&result));
+                result
+            }
+        };
+        Ok(Symbol(val, PhantomData))
+    }
+}
+
+impl Drop for Value {
+    fn drop(&mut self) {
+        let mut atoms = ATOMS.write().expect("atoms locked");
+        atoms.remove(&self.0[..]);
     }
 }
 
 impl<V: Validator + ?Sized> AsRef<str> for Symbol<V> {
     fn as_ref(&self) -> &str {
-        &self.0[..]
+        &(self.0).0[..]
     }
 }
 
 impl<V: Validator + ?Sized> Borrow<str> for Symbol<V> {
     fn borrow(&self) -> &str {
-        &self.0[..]
+        &(self.0).0[..]
     }
 }
 
 impl<V: Validator + ?Sized> Borrow<String> for Symbol<V> {
     fn borrow(&self) -> &String {
-        &self.0
+        &(self.0).0
     }
 }
 
@@ -96,6 +110,7 @@ impl Borrow<String> for Buf {
     }
 }
 
+
 impl<V: Validator + ?Sized> fmt::Debug for Symbol<V> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         V::display(self, fmt)
@@ -104,7 +119,7 @@ impl<V: Validator + ?Sized> fmt::Debug for Symbol<V> {
 
 impl<V: Validator + ?Sized> fmt::Display for Symbol<V> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        self.0.fmt(fmt)
+        (self.0).0.fmt(fmt)
     }
 }
 
@@ -119,14 +134,14 @@ impl<V: Validator> Decodable for Symbol<V> {
 
 impl<V: Validator> Encodable for Symbol<V> {
     fn encode<E: Encoder>(&self, d: &mut E) -> Result<(), E::Error> {
-        d.emit_str(&self.0)
+        d.emit_str(&(self.0).0)
     }
 }
 
 impl<V: Validator + ?Sized> Deref for Symbol<V> {
     type Target = str;
     fn deref(&self) -> &str {
-        &self.0
+        &(self.0).0
     }
 }
 
