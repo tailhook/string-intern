@@ -57,12 +57,26 @@ impl<V: Validator + ?Sized> FromStr for Symbol<V> {
     fn from_str(s: &str) -> Result<Symbol<V>, Self::Err> {
         V::validate_symbol(s)?;
         if let Some(a) = ATOMS.read().expect("atoms locked").get(s) {
-            return Ok(Symbol(a.upgrade().unwrap().clone(), PhantomData));
+            if let Some(a) = a.upgrade() {
+                return Ok(Symbol(a.clone(), PhantomData));
+            }
+            // We may get a race condition where atom has no strong references
+            // any more, but weak reference is still no removed because
+            // destructor is waiting for a lock in another thread.
+            //
+            // That's fine we'll get a write lock and recheck it later.
         }
         let buf = Arc::new(String::from(s));
         let mut atoms = ATOMS.write().expect("atoms locked");
         let val = match atoms.entry(Buf(buf.clone())) {
-            Occupied(e) => e.get().upgrade().unwrap(),
+            Occupied(mut e) => match e.get().upgrade() {
+                Some(a) => a,
+                None => {
+                    let result = Arc::new(Value(buf));
+                    e.insert(Arc::downgrade(&result));
+                    result
+                }
+            },
             Vacant(e) => {
                 let result = Arc::new(Value(buf));
                 e.insert(Arc::downgrade(&result));
