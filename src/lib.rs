@@ -26,7 +26,6 @@
 //! // Both point to the same bytes
 //! assert!(x[..].as_bytes() as *const _ == y[..].as_bytes() as *const _);
 //! ```
-#[macro_use] extern crate quick_error;
 #[macro_use] extern crate lazy_static;
 extern crate rustc_serialize;
 extern crate serde;
