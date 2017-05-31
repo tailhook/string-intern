@@ -11,7 +11,7 @@ Another implementation of string interning for rust. Features:
 * allows to define a type for each kind of interned values and a validator for
   the values of that type.
 * implements ``rustc_serialize::Encodable``/``Decodable``
-
+* implements ``serde`` support
 
 License
 =======
