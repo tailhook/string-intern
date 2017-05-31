@@ -29,6 +29,8 @@
 #[macro_use] extern crate quick_error;
 #[macro_use] extern crate lazy_static;
 extern crate rustc_serialize;
+extern crate serde;
+#[cfg(test)] extern crate serde_json;
 
 mod base_type;
 mod validator;

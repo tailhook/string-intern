@@ -8,6 +8,8 @@ use std::sync::{Arc, RwLock, Weak};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 
+use serde::ser::{Serialize, Serializer};
+use serde::de::{self, Deserialize, Deserializer, Visitor};
 use rustc_serialize::{Decoder, Decodable, Encoder, Encodable};
 use {Validator};
 
@@ -152,6 +154,37 @@ impl<V: Validator> Encodable for Symbol<V> {
     }
 }
 
+struct SymbolVisitor<V: Validator>(PhantomData<V>);
+
+impl<'de, V: Validator> Visitor<'de> for SymbolVisitor<V> {
+    type Value = Symbol<V>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a valid symbol")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where E: de::Error
+    {
+        v.parse().map_err(de::Error::custom)
+    }
+}
+impl<'de, V: Validator> Deserialize<'de> for Symbol<V> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        deserializer.deserialize_str(SymbolVisitor(PhantomData))
+    }
+}
+
+impl<V: Validator> Serialize for Symbol<V> {
+    fn serialize<S: Serializer>(&self, serializer: S)
+        -> Result<S::Ok, S::Error>
+    {
+        serializer.serialize_str(&(self.0).0)
+    }
+}
+
 impl<V: Validator + ?Sized> Deref for Symbol<V> {
     type Target = str;
     fn deref(&self) -> &str {
@@ -179,6 +212,7 @@ mod test {
     use std::io;
     use rustc_serialize::json;
     use {Validator, Symbol};
+    use serde_json;
 
     #[allow(dead_code)]
     struct AnyString;
@@ -236,6 +270,18 @@ mod test {
     #[test]
     fn decode() {
         assert_eq!(json::decode::<Atom>(r#""xyz""#).unwrap(),
+                   Atom::from("xyz"));
+    }
+
+    #[test]
+    fn encode_serde() {
+        assert_eq!(serde_json::to_string(&Atom::from("xyz")).unwrap(),
+                   r#""xyz""#);
+    }
+
+    #[test]
+    fn decode_serde() {
+        assert_eq!(serde_json::from_str::<Atom>(r#""xyz""#).unwrap(),
                    Atom::from("xyz"));
     }
 
