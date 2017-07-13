@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Deref, Drop};
 use std::hash::{Hash, Hasher};
@@ -31,7 +32,7 @@ pub struct Symbol<V: Validator + ?Sized>(Arc<Value>, PhantomData<V>);
 #[derive(PartialEq, Eq, Hash)]
 struct Buf(Arc<String>);
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Value(Arc<String>);
 
 impl<V: Validator + ?Sized> Clone for Symbol<V> {
@@ -50,6 +51,18 @@ impl<V: Validator + ?Sized> Eq for Symbol<V> {}
 impl<V: Validator + ?Sized> Hash for Symbol<V> {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         self.0.hash(hasher)
+    }
+}
+
+impl<V: Validator + ?Sized> PartialOrd for Symbol<V> {
+    fn partial_cmp(&self, other: &Symbol<V>) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<V: Validator + ?Sized> Ord for Symbol<V> {
+    fn cmp(&self, other: &Symbol<V>) -> Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
@@ -244,6 +257,11 @@ mod test {
     #[test]
     fn eq() {
         assert_eq!(Atom::from("x"), Atom::from("x"));
+    }
+
+    #[test]
+    fn ord() {
+        assert!(Atom::from("a") < Atom::from("b"));
     }
 
     #[test]
