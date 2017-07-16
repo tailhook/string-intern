@@ -13,10 +13,14 @@ documentation = "http://docs.rs/string-intern"
 version = "0.1.6"
 authors = ["paul@colomiets.name"]
 
+[features]
+default = ["rustc-serialize", "serde"]
+
 [dependencies]
 lazy_static = "0.2.1"
-rustc-serialize = "0.3.19"
-serde = "1.0.8"
+
+rustc-serialize = { version = "0.3.19", optional = true }
+serde = { version = "1.0.8", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0.2"
