@@ -9,9 +9,9 @@ use std::sync::{Arc, RwLock, Weak};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 
-use serde::ser::{Serialize, Serializer};
-use serde::de::{self, Deserialize, Deserializer, Visitor};
-use rustc_serialize::{Decoder, Decodable, Encoder, Encodable};
+#[cfg(feature = "serde")] use serde::ser::{Serialize, Serializer};
+#[cfg(feature = "serde")] use serde::de::{self, Deserialize, Deserializer, Visitor};
+#[cfg(feature = "rustc-serialize")] use rustc_serialize::{Decoder, Decodable, Encoder, Encodable};
 use {Validator};
 
 lazy_static! {
@@ -152,6 +152,7 @@ impl<V: Validator + ?Sized> fmt::Display for Symbol<V> {
     }
 }
 
+#[cfg(feature = "rustc-serialize")]
 impl<V: Validator> Decodable for Symbol<V> {
     fn decode<D: Decoder>(d: &mut D) -> Result<Self, D::Error> {
         use std::error::Error;
@@ -161,14 +162,17 @@ impl<V: Validator> Decodable for Symbol<V> {
     }
 }
 
+#[cfg(feature = "rustc-serialize")]
 impl<V: Validator> Encodable for Symbol<V> {
     fn encode<E: Encoder>(&self, d: &mut E) -> Result<(), E::Error> {
         d.emit_str(&(self.0).0)
     }
 }
 
+#[cfg(feature = "serde")]
 struct SymbolVisitor<V: Validator>(PhantomData<V>);
 
+#[cfg(feature = "serde")]
 impl<'de, V: Validator> Visitor<'de> for SymbolVisitor<V> {
     type Value = Symbol<V>;
 
@@ -182,6 +186,8 @@ impl<'de, V: Validator> Visitor<'de> for SymbolVisitor<V> {
         v.parse().map_err(de::Error::custom)
     }
 }
+
+#[cfg(feature = "serde")]
 impl<'de, V: Validator> Deserialize<'de> for Symbol<V> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'de>
@@ -190,6 +196,7 @@ impl<'de, V: Validator> Deserialize<'de> for Symbol<V> {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<V: Validator> Serialize for Symbol<V> {
     fn serialize<S: Serializer>(&self, serializer: S)
         -> Result<S::Ok, S::Error>

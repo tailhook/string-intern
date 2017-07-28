@@ -27,8 +27,8 @@
 //! assert!(x[..].as_bytes() as *const _ == y[..].as_bytes() as *const _);
 //! ```
 #[macro_use] extern crate lazy_static;
-extern crate rustc_serialize;
-extern crate serde;
+#[cfg(feature = "rustc-serialize")] extern crate rustc_serialize;
+#[cfg(feature = "serde")] extern crate serde;
 #[cfg(test)] extern crate serde_json;
 
 mod base_type;
